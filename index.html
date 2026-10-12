@@ -1,4 +1,93 @@
-        // URLs do GitHub
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Simulador Logístico 3D</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #111; font-family: sans-serif; user-select: none; }
+        #canvas-container { width: 100vw; height: 100vh; display: block; }
+        
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.6);
+            padding: 10px 15px;
+            border-radius: 8px;
+            pointer-events: none;
+            font-size: 14px;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        #joystick-base {
+            position: absolute;
+            bottom: 40px;
+            left: 40px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.4);
+            border-radius: 50%;
+            touch-action: none;
+        }
+        #joystick-stick {
+            position: absolute;
+            top: 35px;
+            left: 35px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.6);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        #action-btn {
+            position: absolute;
+            bottom: 50px;
+            right: 40px;
+            background: #ff9800;
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 10px;
+            display: none;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <div id="loading">A carregar modelos 3D do GitHub...<br><span id="progress">0%</span></div>
+    <div id="ui">
+        <strong>Modo:</strong> <span id="mode-text">A Pé</span><br>
+        <small>Usa o joystick para mover | Arrasta o ecrã para rodar</small>
+    </div>
+
+    <div id="joystick-base">
+        <div id="joystick-stick"></div>
+    </div>
+    <button id="action-btn">ENTRAR NO EMPILHADOR</button>
+
+    <div id="canvas-container"></div>
+
+    <script>
         const urls = {
             warehouse: 'https://raw.githubusercontent.com/miguelacn1996/logistica_simulador/main/warehouse.glb',
             rack: 'https://raw.githubusercontent.com/miguelacn1996/logistica_simulador/main/rackpallet.glb',
@@ -33,7 +122,6 @@
             controls.dampingFactor = 0.05;
             controls.maxPolarAngle = Math.PI / 2 - 0.05;
 
-            // Iluminação forte
             scene.add(new THREE.AmbientLight(0xffffff, 1.4));
             const dirLight = new THREE.DirectionalLight(0xffffff, 1.8);
             dirLight.position.set(20, 40, 20);
@@ -62,16 +150,14 @@
                 }
             }
 
-            // 1. Armazém (Aumentado para ser grande e espaçoso)
             loader.load(urls.warehouse, (gltf) => {
                 warehouse = gltf.scene;
-                warehouse.scale.set(8, 8, 8); // Aumenta o tamanho do hangar
+                warehouse.scale.set(8, 8, 8);
                 warehouse.position.set(0, 0, 0);
                 scene.add(warehouse);
                 checkLoaded();
             }, undefined, () => checkLoaded());
 
-            // 2. Trabalhador
             loader.load(urls.worker, (gltf) => {
                 worker = gltf.scene;
                 worker.scale.set(1.2, 1.2, 1.2);
@@ -85,7 +171,6 @@
                 checkLoaded();
             });
 
-            // 3. Empilhador
             loader.load(urls.forklift, (gltf) => {
                 forklift = gltf.scene;
                 forklift.scale.set(1.2, 1.2, 1.2);
@@ -99,7 +184,6 @@
                 checkLoaded();
             });
 
-            // 4. Estantes (Rack)
             loader.load(urls.rack, (gltf) => {
                 const rack = gltf.scene;
                 rack.scale.set(1.5, 1.5, 1.5);
@@ -112,7 +196,6 @@
                 checkLoaded();
             }, undefined, () => checkLoaded());
 
-            // 5. Palete
             loader.load(urls.pallet, (gltf) => {
                 const pallet = gltf.scene;
                 pallet.scale.set(1.5, 1.5, 1.5);
@@ -156,71 +239,4 @@
                 stick.style.transform = `translate(0px, 0px)`;
                 moveVector.set(0, 0, 0);
             });
-        }
-
-        function toggleVehicle() {
-            inVehicle = !inVehicle;
-            document.getElementById('mode-text').innerText = inVehicle ? 'A Conduzir Empilhador' : 'A Pé';
-            document.getElementById('action-btn').innerText = inVehicle ? 'SAIR DO EMPILHADOR' : 'ENTRAR NO EMPILHADOR';
-        }
-
-        function updateGame() {
-            const speed = 0.1;
-            const limitX = 18; // Limites das paredes do armazém
-            const limitZ = 18;
-
-            if (moveVector.lengthSq() > 0) {
-                if (!inVehicle && worker) {
-                    let nextX = worker.position.x + moveVector.x * speed;
-                    let nextZ = worker.position.z + moveVector.z * speed;
-
-                    // Colisão básica com as paredes para não atravessar
-                    if (Math.abs(nextX) < limitX) worker.position.x = nextX;
-                    if (Math.abs(nextZ) < limitZ) worker.position.z = nextZ;
-
-                    // Animação de passos (evita deslizar como estátua)
-                    worker.position.y = Math.abs(Math.sin(Date.now() * 0.015)) * 0.15;
-                    worker.rotation.y = Math.atan2(moveVector.x, moveVector.z);
-
-                    controls.target.copy(worker.position);
-                    camera.position.x = worker.position.x;
-                    camera.position.z = worker.position.z + 8;
-                } else if (inVehicle && forklift) {
-                    let nextX = forklift.position.x + moveVector.x * speed;
-                    let nextZ = forklift.position.z + moveVector.z * speed;
-
-                    if (Math.abs(nextX) < limitX) forklift.position.x = nextX;
-                    if (Math.abs(nextZ) < limitZ) forklift.position.z = nextZ;
-
-                    forklift.rotation.y = Math.atan2(moveVector.x, moveVector.z);
-
-                    controls.target.copy(forklift.position);
-                    camera.position.x = forklift.position.x;
-                    camera.position.z = forklift.position.z + 10;
-                }
-            } else if (worker && !inVehicle) {
-                worker.position.y = 0; // Para o balanço quando está parado
-            }
-
-            // Verificar proximidade ao empilhador
-            if (!inVehicle && worker && forklift) {
-                const dist = worker.position.distanceTo(forklift.position);
-                const btn = document.getElementById('action-btn');
-                btn.style.display = dist < 3.5 ? 'block' : 'none';
-            } else if (inVehicle) {
-                document.getElementById('action-btn').style.display = 'block';
-            }
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            updateGame();
-            controls.update();
-            renderer.render(scene, camera);
-        }
+        
