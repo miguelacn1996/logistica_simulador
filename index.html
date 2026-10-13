@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="pt">
 <head>
@@ -102,9 +101,9 @@
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
-            controls.maxPolarAngle = Math.PI / 2 - 0.05; // Evitar entrar debaixo do chão
+            controls.maxPolarAngle = Math.PI / 2 - 0.05;
 
-            // Iluminação profissional sem shadow acne
+            // Iluminação profissional
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
             scene.add(ambientLight);
 
@@ -118,13 +117,16 @@
 
             const loader = new THREE.GLTFLoader();
 
-            // 1. Armazém Principal (Sem sobreposições)
+            // 1. Armazém Principal (Com renderização em dupla face para evitar cortes nas paredes)
             loader.load(baseUrl + 'warehouse.glb', (gltf) => {
                 warehouse = gltf.scene;
                 warehouse.traverse(node => {
                     if (node.isMesh) {
                         node.castShadow = true;
                         node.receiveShadow = true;
+                        if (node.material) {
+                            node.material.side = THREE.DoubleSide;
+                        }
                     }
                 });
                 scene.add(warehouse);
@@ -143,7 +145,7 @@
                 scene.add(forklift);
             }, undefined, err => console.error('Erro forklift:', err));
 
-            // 3. Trabalhador com Animações Articuladas (AnimationMixer)
+            // 3. Trabalhador com Animações Articuladas
             loader.load(baseUrl + 'worker.glb', (gltf) => {
                 worker = gltf.scene;
                 worker.position.set(0, 0, -2);
@@ -156,12 +158,11 @@
                     gltf.animations.forEach((clip) => {
                         workerActions[clip.name.toLowerCase()] = workerMixer.clipAction(clip);
                     });
-                    // Fallback para primeira animação ou caminhar
                     const defaultAction = workerActions['walk'] || workerActions['caminhar'] || workerActions[Object.keys(workerActions)[0]];
                     if (defaultAction) {
                         activeWorkerAction = defaultAction;
                         activeWorkerAction.play();
-                        activeWorkerAction.paused = true; // Só reproduz ao mover
+                        activeWorkerAction.paused = true;
                     }
                 }
             }, undefined, err => console.error('Erro worker:', err));
@@ -181,14 +182,13 @@
                                 racks.push(rack);
                             });
 
-                            // Criar Paletes Carregadas com Caixas e Bidões
+                            // Criar Paletes Carregadas
                             const palletSpots = [{x: -2, z: 6}, {x: 2, z: 10}, {x: 0, z: 14}];
                             palletSpots.forEach(pos => {
                                 const pallet = gltfPallet.scene.clone();
                                 pallet.position.set(pos.x, 0, pos.z);
                                 pallet.traverse(n => { if(n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
 
-                                // Pilha de Caixas
                                 const box1 = gltfBox.scene.clone();
                                 box1.position.set(-0.2, 0.15, -0.2);
                                 box1.scale.set(0.7, 0.7, 0.7);
@@ -204,7 +204,6 @@
                                 boxTop.scale.set(0.6, 0.6, 0.6);
                                 pallet.add(boxTop);
 
-                                // Bidão de Plástico ao lado na palete
                                 const drum = gltfDrum.scene.clone();
                                 drum.position.set(0, 0.15, -0.5);
                                 drum.scale.set(0.85, 0.85, 0.85);
@@ -251,7 +250,9 @@
                 }
 
                 knob.style.transform = `translate(${x}px, ${y}px)`;
-                moveTurn = -x / maxRadius;
+                
+                // CORRIGIDO: Invertido o eixo X para que virar à direita vá para a direita corretamente
+                moveTurn = x / maxRadius;
                 moveForward = -y / maxRadius;
             }
 
@@ -281,7 +282,6 @@
                 if (!worker || !forklift) return;
 
                 if (currentMode === 'worker') {
-                    // Verificar proximidade ao empilhador
                     const dist = worker.position.distanceTo(forklift.position);
                     if (dist < 3.0) {
                         currentMode = 'forklift';
@@ -293,7 +293,6 @@
                         document.getElementById('mission-text').innerText = "Aproxime-se mais do empilhador!";
                     }
                 } else {
-                    // Sair do empilhador
                     currentMode = 'worker';
                     worker.position.copy(forklift.position).add(new THREE.Vector3(1.5, 0, 0));
                     worker.visible = true;
@@ -303,11 +302,9 @@
                 }
             });
 
-            // Controlo de altura dos garfos
             liftUpBtn.addEventListener('mousedown', () => { if (forksHeight < 1.2) forksHeight += 0.05; });
             liftDownBtn.addEventListener('mousedown', () => { if (forksHeight > 0) forksHeight -= 0.05; });
 
-            // Agarrar / Largar Palete Carregada
             actionBtn.addEventListener('click', () => {
                 if (!forklift) return;
 
@@ -368,7 +365,6 @@
 
                 if (workerMixer) workerMixer.update(delta);
 
-                // Câmara a seguir o trabalhador
                 const targetCamPos = new THREE.Vector3(0, 2.5, -4.5).applyMatrix4(worker.matrixWorld);
                 camera.position.lerp(targetCamPos, 0.1);
                 controls.target.lerp(worker.position, 0.1);
@@ -382,7 +378,6 @@
                     forksGroup.position.y = forksHeight;
                 }
 
-                // Câmara a seguir o empilhador
                 const targetCamPos = new THREE.Vector3(0, 3.5, -6.5).applyMatrix4(forklift.matrixWorld);
                 camera.position.lerp(targetCamPos, 0.1);
                 controls.target.lerp(forklift.position, 0.1);
@@ -400,4 +395,3 @@
     </script>
 </body>
 </html>
-```
