@@ -64,8 +64,8 @@
         const baseUrl = 'https://raw.githubusercontent.com/miguelacn1996/logistica_simulador/main/';
 
         let scene, camera, renderer, controls, clock;
-        let warehouse, worker, forklift;
-        let workerMixer, workerActions = {}, activeWorkerAction;
+        let worker, forklift;
+        let workerMixer, activeWorkerAction;
         let pallets = [], racks = [];
         let attachedPallet = null;
         let forksGroup, forksHeight = 0;
@@ -82,7 +82,7 @@
 
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0b0f19);
-            scene.fog = new THREE.FogExp2(0x0b0f19, 0.012);
+            scene.fog = new THREE.FogExp2(0x0b0f19, 0.015);
 
             clock = new THREE.Clock();
 
@@ -104,39 +104,35 @@
             controls.maxPolarAngle = Math.PI / 2 - 0.05;
 
             // Iluminação profissional
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
             scene.add(ambientLight);
 
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.6);
-            dirLight.position.set(15, 25, 15);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            dirLight.position.set(20, 30, 20);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 2048;
             dirLight.shadow.mapSize.height = 2048;
             dirLight.shadow.bias = -0.0005;
             scene.add(dirLight);
 
+            // Chão Limpo e Grelha Industrial (Substitui o warehouse.glb problemático)
+            const floorGeo = new THREE.PlaneGeometry(120, 120);
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            const gridHelper = new THREE.GridHelper(120, 60, 0xf59e0b, 0x334155);
+            gridHelper.position.y = 0.01;
+            scene.add(gridHelper);
+
             const loader = new THREE.GLTFLoader();
 
-            // 1. Armazém Principal (Com escala corrigida e dupla face)
-            loader.load(baseUrl + 'warehouse.glb', (gltf) => {
-                warehouse = gltf.scene;
-                warehouse.scale.set(0.01, 0.01, 0.01); // CORREÇÃO: Escala ajustada para evitar armazém gigante
-                warehouse.traverse(node => {
-                    if (node.isMesh) {
-                        node.castShadow = true;
-                        node.receiveShadow = true;
-                        if (node.material) {
-                            node.material.side = THREE.DoubleSide;
-                        }
-                    }
-                });
-                scene.add(warehouse);
-            }, undefined, err => console.error('Erro warehouse:', err));
-
-            // 2. Empilhador
+            // 1. Empilhador
             loader.load(baseUrl + 'forklift.glb', (gltf) => {
                 forklift = gltf.scene;
-                forklift.position.set(3, 0, 0);
+                forklift.position.set(4, 0, 0);
                 forklift.traverse(node => { if (node.isMesh) node.castShadow = true; });
 
                 forksGroup = new THREE.Group();
@@ -146,7 +142,7 @@
                 scene.add(forklift);
             }, undefined, err => console.error('Erro forklift:', err));
 
-            // 3. Trabalhador com Animações Articuladas
+            // 2. Trabalhador (Com correção para evitar T-pose)
             loader.load(baseUrl + 'worker.glb', (gltf) => {
                 worker = gltf.scene;
                 worker.position.set(0, 0, -2);
@@ -156,36 +152,31 @@
 
                 if (gltf.animations && gltf.animations.length > 0) {
                     workerMixer = new THREE.AnimationMixer(worker);
-                    gltf.animations.forEach((clip) => {
-                        workerActions[clip.name.toLowerCase()] = workerMixer.clipAction(clip);
-                    });
-                    const defaultAction = workerActions['walk'] || workerActions['caminhar'] || workerActions[Object.keys(workerActions)[0]];
-                    if (defaultAction) {
-                        activeWorkerAction = defaultAction;
-                        activeWorkerAction.play();
-                        activeWorkerAction.paused = true;
-                    }
+                    activeWorkerAction = workerMixer.clipAction(gltf.animations[0]);
+                    activeWorkerAction.play();
+                    activeWorkerAction.paused = true; // Só anima ao andar
                 }
             }, undefined, err => console.error('Erro worker:', err));
 
+            // 3. Objetos, Estantes e Paletes com Escalas Corrigidas
             loader.load(baseUrl + 'palleteuro.glb', (gltfPallet) => {
                 loader.load(baseUrl + 'box.glb', (gltfBox) => {
                     loader.load(baseUrl + 'plasticdrum.glb', (gltfDrum) => {
                         loader.load(baseUrl + 'rackpallet.glb', (gltfRack) => {
                             
-                            // Adicionar Estantes de Armazém com Escala Correta
-                            const rackPositions = [{x: -6, z: 5}, {x: 6, z: 5}, {x: -6, z: 12}, {x: 6, z: 12}];
+                            // Estantes
+                            const rackPositions = [{x: -8, z: 6}, {x: 8, z: 6}, {x: -8, z: 14}, {x: 8, z: 14}];
                             rackPositions.forEach(pos => {
                                 const rack = gltfRack.scene.clone();
                                 rack.position.set(pos.x, 0, pos.z);
-                                rack.scale.set(0.01, 0.01, 0.01); // CORREÇÃO: Escala da estante
+                                rack.scale.set(0.01, 0.01, 0.01);
                                 rack.traverse(n => { if(n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
                                 scene.add(rack);
                                 racks.push(rack);
                             });
 
-                            // Criar Paletes Carregadas com Escala Correta
-                            const palletSpots = [{x: -2, z: 6}, {x: 2, z: 10}, {x: 0, z: 14}];
+                            // Paletes Carregadas
+                            const palletSpots = [{x: -3, z: 6}, {x: 3, z: 10}, {x: 0, z: 14}];
                             palletSpots.forEach(pos => {
                                 const pallet = gltfPallet.scene.clone();
                                 pallet.position.set(pos.x, 0, pos.z);
@@ -253,8 +244,6 @@
                 }
 
                 knob.style.transform = `translate(${x}px, ${y}px)`;
-                
-                // Direção corrigida
                 moveTurn = x / maxRadius;
                 moveForward = -y / maxRadius;
             }
