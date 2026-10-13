@@ -4,239 +4,313 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Simulador Logístico 3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
-        body { margin: 0; overflow: hidden; background: #111; font-family: sans-serif; user-select: none; }
+        body { margin: 0; overflow: hidden; background: #0f172a; font-family: sans-serif; touch-action: none; }
         #canvas-container { width: 100vw; height: 100vh; display: block; }
-        
-        #ui {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: white;
-            background: rgba(0,0,0,0.6);
-            padding: 10px 15px;
-            border-radius: 8px;
-            pointer-events: none;
-            font-size: 14px;
-        }
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 20px;
-            background: rgba(0,0,0,0.8);
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-        }
-        #joystick-base {
-            position: absolute;
-            bottom: 40px;
-            left: 40px;
-            width: 120px;
-            height: 120px;
-            background: rgba(255,255,255,0.2);
-            border: 2px solid rgba(255,255,255,0.4);
-            border-radius: 50%;
-            touch-action: none;
-        }
-        #joystick-stick {
-            position: absolute;
-            top: 35px;
-            left: 35px;
-            width: 50px;
-            height: 50px;
-            background: rgba(255,255,255,0.6);
-            border-radius: 50%;
-            pointer-events: none;
-        }
-        #action-btn {
-            position: absolute;
-            bottom: 50px;
-            right: 40px;
-            background: #ff9800;
-            color: white;
-            border: none;
-            padding: 15px 25px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 10px;
-            display: none;
-            cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
+        .ui-panel { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.1); }
     </style>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
-    <div id="loading">A carregar modelos 3D do GitHub...<br><span id="progress">0%</span></div>
-    <div id="ui">
-        <strong>Modo:</strong> <span id="mode-text">A Pé</span><br>
-        <small>Usa o joystick para mover | Arrasta o ecrã para rodar</small>
-    </div>
-
-    <div id="joystick-base">
-        <div id="joystick-stick"></div>
-    </div>
-    <button id="action-btn">ENTRAR NO EMPILHADOR</button>
 
     <div id="canvas-container"></div>
 
+    <!-- UI Superior -->
+    <div class="absolute top-4 left-4 right-4 flex justify-between items-center pointer-events-none">
+        <div class="ui-panel px-4 py-2 rounded-xl text-white shadow-lg pointer-events-auto">
+            <h1 class="font-bold text-sm tracking-wider text-amber-400">LOGISTICS SIMULATOR</h1>
+            <p id="status-text" class="text-xs text-slate-300">Modo: A Conduzir Empilhador</p>
+        </div>
+        <div id="mission-panel" class="ui-panel px-4 py-2 rounded-xl text-white shadow-lg text-right pointer-events-auto">
+            <span class="text-xs text-amber-400 font-semibold">MISSÃO</span>
+            <p id="mission-text" class="text-xs text-slate-200">Transporta a palete para a zona de carga</p>
+        </div>
+    </div>
+
+    <!-- Controles Táteis / HUD Inferior -->
+    <div class="absolute bottom-6 left-6 flex items-center gap-4 pointer-events-auto">
+        <div id="joystick-base" class="w-32 h-32 rounded-full bg-slate-900/60 border-2 border-slate-700 relative flex items-center justify-center shadow-inner">
+            <div id="joystick-knob" class="w-12 h-12 rounded-full bg-amber-500 shadow-md absolute cursor-pointer transition-transform duration-75"></div>
+        </div>
+    </div>
+
+    <!-- Botões de Ação e Garfos -->
+    <div class="absolute bottom-6 right-6 flex flex-col gap-3 pointer-events-auto">
+        <button id="action-btn" class="ui-panel px-6 py-4 rounded-xl text-amber-400 font-bold shadow-lg border border-amber-500/30 flex items-center justify-center gap-2 active:scale-95 transition">
+            <i class="fa-solid fa-hand"></i> AGARRAR PALETE
+        </button>
+        <div class="flex gap-2">
+            <button id="lift-up" class="ui-panel px-4 py-3 rounded-xl text-white font-bold flex-1 flex items-center justify-center gap-1 active:scale-95 transition">
+                <i class="fa-solid fa-arrow-up"></i> SUBIR
+            </button>
+            <button id="lift-down" class="ui-panel px-4 py-3 rounded-xl text-white font-bold flex-1 flex items-center justify-center gap-1 active:scale-95 transition">
+                <i class="fa-solid fa-arrow-down"></i> DESCER
+            </button>
+        </div>
+    </div>
+
+    <!-- Three.js e Loaders -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
     <script>
-        const urls = {
-            warehouse: 'https://raw.githubusercontent.com/miguelacn1996/logistica_simulador/main/warehouse.glb',
-            rack: 'https://raw.githubusercontent.com/miguelacn1996/logistica_simulador/main/rackpallet.glb',
-            pallet: 'https://raw.githubusercontent.com/miguelacn1996/logistica_simulador/main/palleteuro.glb',
-            forklift: 'https://raw.githubusercontent.com/miguelacn1996/logistica_simulador/main/forklift.glb',
-            worker: 'https://raw.githubusercontent.com/miguelacn1996/logistica_simulador/main/worker.glb'
-        };
+        const baseUrl = 'https://raw.githubusercontent.com/miguelacn1996/logistica_simulador/main/';
 
         let scene, camera, renderer, controls;
-        let worker, forklift, warehouse;
-        let moveVector = new THREE.Vector3(0, 0, 0);
-        let inVehicle = false;
+        let forklift, worker, warehouse;
+        let pallets = [], boxes = [], drums = [];
+        let attachedPallet = null;
+        let forksGroup;
+        let forksHeight = 0;
 
-        const loader = new THREE.GLTFLoader();
+        let moveForward = 0, moveTurn = 0;
+        let speed = 0, maxSpeed = 0.08, turnSpeed = 0.03;
 
         init();
+        animate();
 
         function init() {
+            const container = document.getElementById('canvas-container');
+
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x1a1a1a);
+            scene.background = new THREE.Color(0x0f172a);
+            scene.fog = new THREE.FogExp2(0x0f172a, 0.015);
 
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 5, 12);
+            camera.position.set(0, 5, -8);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.shadowMap.enabled = true;
-            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            container.appendChild(renderer.domElement);
 
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
-            controls.maxPolarAngle = Math.PI / 2 - 0.05;
 
-            scene.add(new THREE.AmbientLight(0xffffff, 1.4));
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.8);
-            dirLight.position.set(20, 40, 20);
+            // Iluminação otimizada para o armazém real
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            dirLight.position.set(10, 20, 10);
             dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.bias = -0.0005;
             scene.add(dirLight);
 
-            loadAssets();
-            setupJoystick();
+            const loader = new THREE.GLTFLoader();
+
+            // 1. Carregar Armazém Único (Sem duplicados)
+            loader.load(baseUrl + 'warehouse.glb', (gltf) => {
+                warehouse = gltf.scene;
+                warehouse.traverse(node => {
+                    if (node.isMesh) {
+                        node.castShadow = true;
+                        node.receiveShadow = true;
+                    }
+                });
+                scene.add(warehouse);
+            }, undefined, (error) => console.error('Erro warehouse:', error));
+
+            // 2. Carregar Empilhador
+            loader.load(baseUrl + 'forklift.glb', (gltf) => {
+                forklift = gltf.scene;
+                forklift.position.set(0, 0, 0);
+                forklift.scale.set(1, 1, 1);
+                forklift.traverse(node => {
+                    if (node.isMesh) node.castShadow = true;
+                });
+                
+                // Criar grupo de garfos para elevação
+                forksGroup = new THREE.Group();
+                forksGroup.position.set(0, 0, 0);
+                forklift.add(forksGroup);
+
+                scene.add(forklift);
+            }, undefined, (error) => console.error('Erro forklift:', error));
+
+            // 3. Carregar Paletes, Caixas e Bidões
+            loader.load(baseUrl + 'palleteuro.glb', (gltfPallet) => {
+                loader.load(baseUrl + 'box.glb', (gltfBox) => {
+                    loader.load(baseUrl + 'plasticdrum.glb', (gltfDrum) => {
+                        
+                        // Criar 3 paletes carregadas pelo armazém
+                        const positions = [
+                            { x: -4, z: 5 },
+                            { x: 4, z: 8 },
+                            { x: 0, z: 12 }
+                        ];
+
+                        positions.forEach(pos => {
+                            const pallet = gltfPallet.scene.clone();
+                            pallet.position.set(pos.x, 0, pos.z);
+                            pallet.scale.set(1, 1, 1);
+                            pallet.traverse(n => { if(n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
+
+                            // Adicionar Caixas em cima da palete
+                            const box1 = gltfBox.scene.clone();
+                            box1.position.set(0, 0.15, 0);
+                            box1.scale.set(0.8, 0.8, 0.8);
+                            pallet.add(box1);
+
+                            const box2 = gltfBox.scene.clone();
+                            box2.position.set(0.3, 0.45, 0.2);
+                            box2.scale.set(0.7, 0.7, 0.7);
+                            pallet.add(box2);
+
+                            // Adicionar Bidões de plástico nos cantos do armazém
+                            const drum = gltfDrum.scene.clone();
+                            drum.position.set(pos.x + 1.5, 0, pos.z);
+                            drum.scale.set(0.9, 0.9, 0.9);
+                            scene.add(drum);
+
+                            scene.add(pallet);
+                            pallets.push(pallet);
+                        });
+
+                    });
+                });
+            });
+
+            setupTouchControls();
+            setupActionButtons();
 
             window.addEventListener('resize', onWindowResize);
-            document.getElementById('action-btn').addEventListener('click', toggleVehicle);
-
-            animate();
         }
 
-        function loadAssets() {
-            let loadedCount = 0;
-            const totalAssets = 5;
+        function setupTouchControls() {
+            const base = document.getElementById('joystick-base');
+            const knob = document.getElementById('joystick-knob');
+            let active = false;
+            let rect = base.getBoundingClientRect();
+            let maxRadius = 40;
 
-            function checkLoaded() {
-                loadedCount++;
-                const percent = Math.round((loadedCount / totalAssets) * 100);
-                document.getElementById('progress').innerText = percent + '%';
-                if (loadedCount >= totalAssets) {
-                    document.getElementById('loading').style.display = 'none';
-                }
+            function handleStart(e) {
+                active = true;
+                rect = base.getBoundingClientRect();
+                handleMove(e);
             }
 
-            loader.load(urls.warehouse, (gltf) => {
-                warehouse = gltf.scene;
-                warehouse.scale.set(8, 8, 8);
-                warehouse.position.set(0, 0, 0);
-                scene.add(warehouse);
-                checkLoaded();
-            }, undefined, () => checkLoaded());
+            function handleMove(e) {
+                if (!active) return;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-            loader.load(urls.worker, (gltf) => {
-                worker = gltf.scene;
-                worker.scale.set(1.2, 1.2, 1.2);
-                worker.position.set(0, 0, 3);
-                scene.add(worker);
-                checkLoaded();
-            }, undefined, () => {
-                worker = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.6, 0.4), new THREE.MeshStandardMaterial({color: 0x00ff00}));
-                worker.position.set(0, 0.8, 3);
-                scene.add(worker);
-                checkLoaded();
-            });
+                let x = clientX - (rect.left + rect.width / 2);
+                let y = clientY - (rect.top + rect.height / 2);
 
-            loader.load(urls.forklift, (gltf) => {
-                forklift = gltf.scene;
-                forklift.scale.set(1.2, 1.2, 1.2);
-                forklift.position.set(5, 0, 0);
-                scene.add(forklift);
-                checkLoaded();
-            }, undefined, () => {
-                forklift = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 2.5), new THREE.MeshStandardMaterial({color: 0xffcc00}));
-                forklift.position.set(5, 0.75, 0);
-                scene.add(forklift);
-                checkLoaded();
-            });
+                const distance = Math.sqrt(x * x + y * y);
+                if (distance > maxRadius) {
+                    x *= maxRadius / distance;
+                    y *= maxRadius / distance;
+                }
 
-            loader.load(urls.rack, (gltf) => {
-                const rack = gltf.scene;
-                rack.scale.set(1.5, 1.5, 1.5);
-                rack.position.set(-8, 0, -6);
-                scene.add(rack);
-                
-                const rack2 = rack.clone();
-                rack2.position.set(-8, 0, 6);
-                scene.add(rack2);
-                checkLoaded();
-            }, undefined, () => checkLoaded());
+                knob.style.transform = `translate(${x}px, ${y}px)`;
 
-            loader.load(urls.pallet, (gltf) => {
-                const pallet = gltf.scene;
-                pallet.scale.set(1.5, 1.5, 1.5);
-                pallet.position.set(2, 0, 3);
-                scene.add(pallet);
-                checkLoaded();
-            }, undefined, () => checkLoaded());
+                moveTurn = -x / maxRadius;
+                moveForward = -y / maxRadius;
+            }
+
+            function handleEnd() {
+                active = false;
+                knob.style.transform = `translate(0px, 0px)`;
+                moveForward = 0;
+                moveTurn = 0;
+            }
+
+            base.addEventListener('touchstart', handleStart);
+            window.addEventListener('touchmove', handleMove);
+            window.addEventListener('touchend', handleEnd);
+
+            base.addEventListener('mousedown', handleStart);
+            window.addEventListener('mousemove', handleMove);
+            window.addEventListener('mouseup', handleEnd);
         }
 
-        function setupJoystick() {
-            const base = document.getElementById('joystick-base');
-            const stick = document.getElementById('joystick-stick');
-            let tracking = false;
-            let center = { x: 0, y: 0 };
-            const maxDist = 40;
+        function setupActionButtons() {
+            const actionBtn = document.getElementById('action-btn');
+            const liftUpBtn = document.getElementById('lift-up');
+            const liftDownBtn = document.getElementById('lift-down');
 
-            base.addEventListener('pointerdown', (e) => {
-                tracking = true;
-                const rect = base.getBoundingClientRect();
-                center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            liftUpBtn.addEventListener('mousedown', () => { if(forksHeight < 1.2) forksHeight += 0.05; });
+            liftDownBtn.addEventListener('mousedown', () => { if(forksHeight > 0) forksHeight -= 0.05; });
+
+            actionBtn.addEventListener('click', () => {
+                if (!forklift) return;
+
+                if (!attachedPallet) {
+                    // Tentar agarrar a palete mais próxima
+                    pallets.forEach(pallet => {
+                        const dist = forklift.position.distanceTo(pallet.position);
+                        if (dist < 2.5) {
+                            attachedPallet = pallet;
+                            scene.remove(pallet);
+                            forklift.add(pallet);
+                            pallet.position.set(0, forksHeight, 1.2);
+                            document.getElementById('mission-text').innerText = "Palete carregada! Leva ao destino.";
+                            actionBtn.innerHTML = `<i class="fa-solid fa-box-open"></i> LARGAR PALETE`;
+                            actionBtn.classList.add('text-rose-400', 'border-rose-500/30');
+                        }
+                    });
+                } else {
+                    // Largar palete
+                    forklift.remove(attachedPallet);
+                    scene.add(attachedPallet);
+                    const worldPos = new THREE.Vector3();
+                    attachedPallet.getWorldPosition(worldPos);
+                    const worldQuat = new THREE.Quaternion();
+                    attachedPallet.getWorldQuaternion(worldQuat);
+                    
+                    attachedPallet.position.copy(worldPos);
+                    attachedPallet.quaternion.copy(worldQuat);
+
+                    attachedPallet = null;
+                    document.getElementById('mission-text').innerText = "Palete entregue com sucesso!";
+                    actionBtn.innerHTML = `<i class="fa-solid fa-hand"></i> AGARRAR PALETE`;
+                    actionBtn.classList.remove('text-rose-400', 'border-rose-500/30');
+                }
             });
+        }
 
-            window.addEventListener('pointermove', (e) => {
-                if (!tracking) return;
-                const dx = e.clientX - center.x;
-                const dy = e.clientY - center.y;
-                const dist = Math.min(Math.sqrt(dx * dx + dy * dy), maxDist);
-                const angle = Math.atan2(dy, dx);
+        function animate() {
+            requestAnimationFrame(animate);
 
-                const constrainedX = Math.cos(angle) * dist;
-                const constrainedY = Math.sin(angle) * dist;
+            if (forklift) {
+                speed = moveForward * maxSpeed;
+                forklift.rotation.y += moveTurn * turnSpeed * (speed !== 0 ? 1 : 0);
+                forklift.translateZ(speed);
 
-                stick.style.transform = `translate(${constrainedX}px, ${constrainedY}px)`;
-                moveVector.x = constrainedX / maxDist;
-                moveVector.z = constrainedY / maxDist;
-            });
+                // Atualizar altura dos garfos
+                if(forksGroup) {
+                    forksGroup.position.y = forksHeight;
+                }
 
-            window.addEventListener('pointerup', () => {
-                if (!tracking) return;
-                tracking = false;
-                stick.style.transform = `translate(0px, 0px)`;
-                moveVector.set(0, 0, 0);
-            });
-        
+                // Seguir câmara suavemente atrás do empilhador
+                const targetCameraPos = new THREE.Vector3(0, 3, -6).applyMatrix4(forklift.matrixWorld);
+                camera.position.lerp(targetCameraPos, 0.1);
+                controls.target.lerp(forklift.position, 0.1);
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+</html>
+```eof
+
+O teu simulador está agora limpo de geometrias duplicadas, com sombras perfeitas e pronto para carregar e transportar as paletes com caixas e bidões! Podes atualizar o ficheiro no AI Studio e testar.
